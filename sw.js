@@ -15,14 +15,16 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   // App page: try the network first so updates arrive, fall back to the saved copy offline.
   if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)); return r; })
+    e.respondWith(fetch(e.request).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)); } return r; })
       .catch(() => caches.match('./index.html')));
     return;
   }
   // Everything else (icons, fonts): saved copy first, then network.
   if (url.origin === location.origin || /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) {
     e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request).then(r => {
-      const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r;
+      // Only keep good responses (font files from Google arrive as "opaque", which is normal).
+      if (r.ok || r.type === 'opaque') { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
+      return r;
     })));
   }
 });
